@@ -175,6 +175,7 @@ export class BaseWrapper {
     );
 
     let response = useProxy
+          ? Fetch(url, {
           method: 'GET',
           headers: this.headers,
           signal: AbortSignal.timeout(this.indexerTimeout),
