@@ -238,6 +238,44 @@ export interface ModifierContext {
 }
 
 /**
+ * The longest string a render keeps
+ */
+export const MAX_RENDER_LENGTH = 8000;
+
+/**
+ * `replaceAll` which adheres to `MAX_RENDER_LENGTH`.
+ */
+function replaceAll(
+  value: string,
+  search: string,
+  replacement: string
+): string {
+  if (!search) return value;
+
+  const growth = replacement.length - search.length;
+  const worstCase =
+    growth <= 0
+      ? value.length
+      : value.length + Math.floor(value.length / search.length) * growth;
+  if (worstCase <= MAX_RENDER_LENGTH) {
+    return value.replaceAll(search, replacement);
+  }
+
+  let out = '';
+  let from = 0;
+  while (out.length < MAX_RENDER_LENGTH) {
+    const at = value.indexOf(search, from);
+    if (at === -1) {
+      out += value.slice(from);
+      break;
+    }
+    out += value.slice(from, at) + replacement;
+    from = at + search.length;
+  }
+  return out.length > MAX_RENDER_LENGTH ? out.slice(0, MAX_RENDER_LENGTH) : out;
+}
+
+/**
  * Returns `undefined` when the modifier does not apply to the value's runtime
  * type; the caller turns that into the right error message.
  */
@@ -319,7 +357,9 @@ function compileParameterised(
         return (value, parseValue, ctx) => {
           if (typeof value !== 'string') return undefined;
           const resolved = ctx.resolveVariable(variablePath, parseValue);
-          return resolved ? value.replaceAll(resolved, replacementText) : value;
+          return resolved
+            ? replaceAll(value, resolved, replacementText)
+            : value;
         };
       }
 
@@ -344,11 +384,11 @@ function compileParameterised(
 
       return (value, parseValue, ctx) => {
         if (typeof value !== 'string') return undefined;
-        if (!variableKey) return value.replaceAll(rawSearch, replacementText);
+        if (!variableKey) return replaceAll(value, rawSearch, replacementText);
 
         const resolved = ctx.resolveVariable(variableKey, parseValue);
         if (!resolved) return value;
-        return value.replaceAll(resolved, replacementText);
+        return replaceAll(value, resolved, replacementText);
       };
     }
 

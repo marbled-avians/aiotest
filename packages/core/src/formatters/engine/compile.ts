@@ -2,6 +2,7 @@ import { ExpressionNode, GroupNode, OperandNode, TemplateNode } from './ast.js';
 import { parseTemplate } from './parser.js';
 import {
   CompiledModifier,
+  MAX_RENDER_LENGTH,
   ModifierContext,
   compileModifier,
 } from './modifiers.js';
@@ -27,6 +28,25 @@ export interface CompileHooks<TValue> {
 }
 
 const MAX_TEMPLATE_DEPTH = 5;
+
+/**
+ * What the render in progress has left of `MAX_RENDER_LENGTH`.
+ *
+ * A render is synchronous from the outermost template down, so two of them can
+ * never interleave on this.
+ */
+let renderBudget = MAX_RENDER_LENGTH;
+
+/** Appends only while the budget lasts */
+function emit<TValue>(
+  render: CompiledTemplate<TValue>,
+  parseValue: TValue
+): string {
+  if (renderBudget <= 0) return '';
+  const text = render(parseValue);
+  renderBudget -= text.length;
+  return text;
+}
 
 /** A resolved operand or expression. */
 export interface Resolved {
@@ -68,6 +88,10 @@ function resolveOperand<TValue extends Record<string, any>>(
       const next = apply(value, parseValue, ctx);
       if (next === undefined) break;
       value = next;
+      if (typeof value === 'string' && value.length > MAX_RENDER_LENGTH) {
+        value = value.slice(0, MAX_RENDER_LENGTH);
+        break;
+      }
     }
     return { result: value, present: true };
   }
@@ -114,7 +138,15 @@ function resolveOperand<TValue extends Record<string, any>>(
     // already have changed the type of
     const input = result;
     result = apply(input, parseValue, ctx);
-    if (result !== undefined) continue;
+    if (result !== undefined) {
+      // a single modifier can multiply its input, so the chain is bounded as it
+      // runs and not once it has already built the string
+      if (typeof result === 'string' && result.length > MAX_RENDER_LENGTH) {
+        result = result.slice(0, MAX_RENDER_LENGTH);
+        break;
+      }
+      continue;
+    }
 
     // a modifier on an absent value renders nothing
     if (input === null || input === undefined) return { result: '', present };
@@ -282,7 +314,7 @@ function compileGroup<TValue extends Record<string, any>>(
         if (resolved.error === undefined && resolved.present === false)
           return '';
       }
-      out += render(parseValue);
+      out += emit(render, parseValue);
     }
     return out;
   };
@@ -320,11 +352,20 @@ export function compileTemplate<TValue extends Record<string, any>>(
   const { nodes } = parseTemplate(source);
   const compiled = nodes.map((node) => compileNode(node, hooks, depth));
 
-  if (compiled.length === 1) return compiled[0];
+  const render: CompiledTemplate<TValue> =
+    compiled.length === 1
+      ? compiled[0]
+      : (parseValue) => {
+          let out = '';
+          for (const part of compiled) out += emit(part, parseValue);
+          return out;
+        };
 
+  // the outermost template owns the budget; the branch templates compiled
+  // beneath it spend what is left rather than starting again
+  if (depth > 0) return render;
   return (parseValue) => {
-    let out = '';
-    for (const render of compiled) out += render(parseValue);
-    return out;
+    renderBudget = MAX_RENDER_LENGTH;
+    return render(parseValue);
   };
 }
