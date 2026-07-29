@@ -456,6 +456,12 @@ export class UsenetEngine {
    * an inner file, else the file itself.
    */
   backingIndices(nzb: Nzb, content: NzbContent, fileIndex: number): number[] {
+    for (const f of content.files) {
+      for (const inner of f.archiveInner ?? []) {
+        const members = inner.layout?.memberIndices;
+        if (members?.includes(fileIndex)) return members;
+      }
+    }
     const refs: ContentFileRef[] = content.files.map((f) => ({
       index: f.index,
       filename: f.filename,
