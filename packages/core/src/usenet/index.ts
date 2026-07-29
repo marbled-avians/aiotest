@@ -31,6 +31,7 @@ import {
   classifyProjectedHoles,
   type HoleVerdict,
   type HoleHooks,
+  type HoleKind,
 } from './holes.js';
 import {
   inspectArchiveSets,
@@ -141,6 +142,7 @@ export {
   NntpError,
   ArticleNotFoundError,
   isProviderUnavailableError,
+  definitiveLossKind,
 } from './nntp/errors.js';
 export type { NzbContent, NzbContentFile } from './pool/inspect/index.js';
 export {
@@ -1011,6 +1013,7 @@ export class UsenetEngine {
     onHole?: (info: {
       windowOffset: number;
       windowLength: number;
+      kind: HoleKind;
     }) => 'pad' | 'fail';
   } {
     const prefetchWindows = Math.max(
@@ -1041,6 +1044,7 @@ export class UsenetEngine {
                 nzbFileIndex: repFileIndex,
                 windowOffset: info.windowOffset,
                 bytes: info.windowLength,
+                kind: info.kind,
               })
           : undefined,
     };
