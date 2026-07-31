@@ -63,6 +63,9 @@ function mapDebridErrorToStaticFile(code: string | undefined): string {
     case 'UNPROCESSABLE_ENTITY':
     case 'UNSUPPORTED_MEDIA_TYPE':
     case 'STORE_MAGNET_INVALID':
+    case 'DOWNLOAD_FAILED':
+    case 'BAD_GATEWAY':
+    case 'GONE':
       return StaticFiles.DOWNLOAD_FAILED;
     case 'NO_MATCHING_FILE':
       return StaticFiles.NO_MATCHING_FILE;

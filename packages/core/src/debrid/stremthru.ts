@@ -1284,7 +1284,7 @@ export class StremThruService
             {
               statusCode: 400,
               statusText: `Usenet download ${polledDownload.status}`,
-              code: 'UNKNOWN',
+              code: 'DOWNLOAD_FAILED',
               headers: {},
               body: polledDownload,
             }
