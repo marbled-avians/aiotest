@@ -69,6 +69,8 @@ function mapDebridErrorToStaticFile(code: string | undefined): string {
       return StaticFiles.DOWNLOAD_FAILED;
     case 'NO_MATCHING_FILE':
       return StaticFiles.NO_MATCHING_FILE;
+    case 'TIMEOUT':
+      return StaticFiles.DOWNLOADING;
     default:
       return StaticFiles.INTERNAL_SERVER_ERROR;
   }

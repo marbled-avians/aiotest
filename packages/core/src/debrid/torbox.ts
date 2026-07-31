@@ -877,7 +877,7 @@ export class TorboxDebridService
           {
             statusCode: 408,
             statusText: 'Timeout',
-            code: 'UNKNOWN',
+            code: 'TIMEOUT',
             headers: {},
             body: usenetDownload,
             type: 'api_error',

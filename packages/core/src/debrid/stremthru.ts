@@ -1033,7 +1033,7 @@ export class StremThruService
         throw new DebridError(`Timed out waiting for magnet to download`, {
           statusCode: 408,
           statusText: `Timed out waiting for magnet to download`,
-          code: 'UNKNOWN',
+          code: 'TIMEOUT',
           headers: {},
           body: magnetDownload,
         });
@@ -1305,7 +1305,7 @@ export class StremThruService
           {
             statusCode: 408,
             statusText: `Timed out waiting for usenet download to complete`,
-            code: 'UNKNOWN',
+            code: 'TIMEOUT',
             headers: {},
             body: usenetDownload,
           }
