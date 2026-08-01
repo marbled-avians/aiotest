@@ -5,7 +5,7 @@ import {
 } from '../db/repositories/stream-sessions.js';
 import { appConfig } from '../utils/index.js';
 import { createLogger } from '../logging/logger.js';
-import { streamRegistry } from './registry.js';
+import { streamRegistry, STALE_SESSION_MS } from './registry.js';
 import { refreshStreamBans } from './bans.js';
 import {
   bandwidthBreakdown,
@@ -231,10 +231,18 @@ export async function flushStreamSessions(): Promise<{
 /**
  * Drop history and rollups past their retention. Bans that have expired go
  * too, since only live ones are ever consulted.
+ *
+ * Rows abandoned by a replica that never came back are closed out first:
+ * retention only deletes finished sessions, so an orphan is otherwise
+ * un-prunable until a restart.
  */
 export async function pruneStreamSessions(): Promise<number> {
   const now = Date.now();
   const retentionDays = appConfig.streams.historyRetentionDays;
+  const stale = await StreamSessionRepository.endStale(
+    now - STALE_SESSION_MS,
+    now
+  );
   const [sessions, bandwidth, bans] = await Promise.all([
     retentionDays > 0
       ? StreamSessionRepository.pruneOlderThan(now - retentionDays * DAY_MS)
@@ -244,7 +252,7 @@ export async function pruneStreamSessions(): Promise<number> {
     ),
     StreamSessionRepository.pruneExpiredBans(now),
   ]);
-  return sessions + bandwidth + bans;
+  return stale + sessions + bandwidth + bans;
 }
 
 /**

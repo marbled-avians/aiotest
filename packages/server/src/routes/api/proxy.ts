@@ -402,6 +402,9 @@ router.all(
       const isGetRequest = req.method === 'GET';
 
       if (isGetRequest) {
+        // Without probes, a viewer that vanishes without a FIN leaves the
+        // response hanging on a socket nothing will ever close.
+        req.socket.setKeepAlive(true, 60_000);
         // Seeks join the session already open for this (user, ip, target)
         // and skip admission.
         session = streamRegistry.open({

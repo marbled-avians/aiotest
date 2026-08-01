@@ -49,7 +49,14 @@ const ACTIVITY_WINDOW_MS = 5_000;
  * paused stream stays quiet until the engine reaps its reader an hour in, and
  * a live owner rewrites its rows every flush.
  */
-const STALE_SESSION_MS = 24 * 60 * 60_000;
+export const STALE_SESSION_MS = 24 * 60 * 60_000;
+
+/**
+ * How long a session may hold an open read without serving a byte before its
+ * reader is assumed dead: a viewer that vanishes without a FIN leaves a socket
+ * nothing will ever close. Far longer than any real pause.
+ */
+const STUCK_READ_MS = 6 * 60 * 60_000;
 
 /** Raised on a reader whose session was force-stopped. */
 export class StreamStoppedError extends Error {
@@ -388,14 +395,15 @@ export class StreamRegistry {
 
   /**
    * Finish sessions quiet for longer than the idle timeout. One with an open
-   * read is never swept: the client is still connected, just buffered.
+   * read is normally just buffered, so it gets {@link STUCK_READ_MS} instead.
    */
   sweep(now = Date.now()): number {
-    const cutoff = idleTimeoutMs();
     let ended = 0;
     for (const session of [...this.byKey.values()]) {
-      if (session.reads.size === 0 && now - session.lastSeenAt > cutoff) {
-        this.finalise(session, 'idle', now);
+      const open = session.reads.size > 0;
+      const cutoff = open ? STUCK_READ_MS : idleTimeoutMs();
+      if (now - session.lastSeenAt > cutoff) {
+        this.finalise(session, open ? 'stale' : 'idle', now);
         ended++;
       }
     }
@@ -412,6 +420,10 @@ export class StreamRegistry {
 
     const upserts: StreamSessionUpsert[] = [];
     const bandwidth = new Map<string, StreamBandwidthDelta>();
+    // What this pass takes out of the live state, so a failed write can put
+    // it back.
+    const claimedBytes: Array<[Session, number]> = [];
+    const claimedDirty: Session[] = [];
     const collect = (s: Session) => {
       if (s.pendingBytes > 0) {
         const key = JSON.stringify([s.username, s.transport]);
@@ -423,12 +435,14 @@ export class StreamRegistry {
         };
         delta.bytes += s.pendingBytes;
         bandwidth.set(key, delta);
+        claimedBytes.push([s, s.pendingBytes]);
         s.pendingBytes = 0;
       }
       // Live rows are rewritten every flush, not just dirty ones: the row is
       // how another replica knows the session still has an owner.
       if (!s.dirty && s.ended !== undefined) return;
       s.dirty = false;
+      claimedDirty.push(s);
       upserts.push({
         id: s.id,
         transport: s.transport,
@@ -456,11 +470,25 @@ export class StreamRegistry {
     this.finalised = [];
     for (const s of closing) collect(s);
 
+    let bandwidthWritten = false;
+    let written = upserts.length;
     try {
       await StreamSessionRepository.addBandwidth([...bandwidth.values()]);
+      bandwidthWritten = true;
       await StreamSessionRepository.upsertMany(upserts);
     } catch (err) {
-      logger.warn({ err }, 'failed to persist stream sessions');
+      // The bytes are what the caps measure, and a finished session with no
+      // `endedAt` leaves an active row nothing will ever close.
+      if (!bandwidthWritten) {
+        for (const [s, bytes] of claimedBytes) s.pendingBytes += bytes;
+      }
+      for (const s of claimedDirty) s.dirty = true;
+      this.finalised = closing.concat(this.finalised);
+      written = 0;
+      logger.warn(
+        { err, sessions: upserts.length },
+        'failed to persist stream sessions; retrying on the next flush'
+      );
     }
 
     await Promise.all([refreshStreamBans(), refreshBandwidthUsage(now)]);
@@ -468,7 +496,7 @@ export class StreamRegistry {
     this.enforceBandwidth(now);
     await this.applyRemoteStops();
 
-    return { written: upserts.length, ended };
+    return { written, ended };
   }
 
   /** Kill anything belonging to a user who has since been banned or blocked. */

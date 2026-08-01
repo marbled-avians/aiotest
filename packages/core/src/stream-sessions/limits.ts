@@ -12,7 +12,11 @@ import type { AdmissionVerdict } from './types.js';
  * synchronous so check-and-reserve cannot interleave with a competing open.
  */
 export interface AdmissionInput {
-  /** Empty for callers we cannot identify; those bypass every limit. */
+  /**
+   * Empty for callers we cannot identify (a stream token minted before owners
+   * were recorded). Those skip the bans and per-user caps, but still count
+   * against the instance-wide pools.
+   */
   username: string;
   targetKey: string;
   /** Sessions already serving bytes for this user, across all transports. */
@@ -45,9 +49,11 @@ export function globalConnectionLimit(): number {
  * after a pause, never on the reads of a session already under way.
  */
 export function checkAdmission(input: AdmissionInput): AdmissionVerdict {
-  if (!input.username) return OK;
+  const identified = Boolean(input.username);
 
-  const ban = findStreamBan(input.username, input.targetKey);
+  const ban = identified
+    ? findStreamBan(input.username, input.targetKey)
+    : undefined;
   if (ban) {
     const until = ban.expiresAt
       ? ` until ${new Date(ban.expiresAt).toISOString()}`
@@ -65,7 +71,7 @@ export function checkAdmission(input: AdmissionInput): AdmissionVerdict {
         };
   }
 
-  const connectionLimit = connectionLimitFor(input.username);
+  const connectionLimit = identified ? connectionLimitFor(input.username) : 0;
   if (connectionLimit > 0 && input.activeSessions >= connectionLimit) {
     return {
       ok: false,
@@ -86,7 +92,7 @@ export function checkAdmission(input: AdmissionInput): AdmissionVerdict {
     };
   }
 
-  const userLimit = userBandwidthLimit(input.username);
+  const userLimit = identified ? userBandwidthLimit(input.username) : 0;
   if (userLimit > 0 && input.userBytes >= userLimit) {
     return {
       ok: false,
