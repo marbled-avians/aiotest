@@ -5,6 +5,7 @@ import {
   openNativeUsenetStream,
   DebridError,
 } from '@aiostreams/core';
+import { mapDebridErrorToStaticFile } from '../../app.js';
 import { corsMiddleware } from '../../middlewares/cors.js';
 
 const logger = createLogger('server:usenet');
@@ -181,10 +182,18 @@ router.get(
       }
 
       if (err instanceof DebridError) {
-        res.status(err.statusCode || 502).json({
-          success: false,
-          detail: err.message,
-        });
+        logger.warn(
+          { err: err.message, code: err.code, status: err.statusCode },
+          'usenet stream failed before any bytes were sent'
+        );
+        if (req.query.download !== undefined) {
+          res.status(err.statusCode || 502).json({
+            success: false,
+            detail: err.message,
+          });
+        } else {
+          res.redirect(302, `/static/${mapDebridErrorToStaticFile(err.code)}`);
+        }
         return;
       }
       next(err);

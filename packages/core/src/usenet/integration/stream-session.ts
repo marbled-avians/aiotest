@@ -676,10 +676,21 @@ export async function openNativeUsenetStream(opts: {
       },
       'usenet stream refused'
     );
+
+    const forbidden =
+      admitted.verdict.reason === 'banned' ||
+      admitted.verdict.reason === 'blocked';
+    const outOfSlots =
+      admitted.verdict.reason === 'connection_user' ||
+      admitted.verdict.reason === 'connection_global';
     throw new DebridError(admitted.verdict.message ?? 'stream not permitted', {
-      statusCode: 403,
-      statusText: 'Forbidden',
-      code: 'FORBIDDEN',
+      statusCode: forbidden ? 403 : 429,
+      statusText: forbidden ? 'Forbidden' : 'Too Many Requests',
+      code: forbidden
+        ? 'FORBIDDEN'
+        : outOfSlots
+          ? 'TOO_MANY_ACTIVE_CONNECTIONS'
+          : 'TOO_MANY_REQUESTS',
       headers: {},
       body: null,
       type: 'api_error',
