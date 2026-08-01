@@ -83,6 +83,7 @@ router.get(
         start: requested?.start,
         end: requested?.endExclusive,
         signal: controller.signal,
+        clientIp: req.requestIp || req.ip || req.socket.remoteAddress,
       });
 
       const { size, start, end, stream, filename, etag, lastModified } = opened;
@@ -142,8 +143,13 @@ router.get(
         return;
       }
 
+      // A clean FIN is invisible to a player whose buffer is full.
       stream.once('error', (err: NodeJS.ErrnoException) => {
-        if (err?.code === 'USENET_STREAM_REAPED' && !socket.destroyed) {
+        if (
+          (err?.code === 'USENET_STREAM_REAPED' ||
+            err?.code === 'STREAM_STOPPED') &&
+          !socket.destroyed
+        ) {
           socket.resetAndDestroy();
         }
       });
@@ -160,7 +166,8 @@ router.get(
         code === 'EPIPE' ||
         code === 'ERR_STREAM_DESTROYED' ||
         code === 'ABORT_ERR' ||
-        code === 'USENET_STREAM_REAPED';
+        code === 'USENET_STREAM_REAPED' ||
+        code === 'STREAM_STOPPED';
 
       if (isClientDisconnect) {
         logger.debug({ code }, 'client disconnected from usenet stream');
