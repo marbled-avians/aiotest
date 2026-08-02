@@ -27,6 +27,7 @@ export {
   refreshBandwidthUsage,
   resolveBandwidthWindow,
   userBandwidthLimit,
+  type BandwidthUserSeries,
   type BandwidthWindow,
 } from './bandwidth.js';
 export {

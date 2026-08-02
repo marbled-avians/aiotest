@@ -78,6 +78,11 @@ export interface StreamBandwidthBucket {
   bytes: number;
 }
 
+/** A bucket of one user's usage, for the per-user chart. */
+export interface StreamBandwidthUserBucket extends StreamBandwidthBucket {
+  username: string;
+}
+
 export type StreamBanScope = 'user' | 'target';
 
 export interface StreamBan {
@@ -138,6 +143,14 @@ const HOUR_MS = 3_600_000;
 
 function hourFloor(ts: number): number {
   return ts - (ts % HOUR_MS);
+}
+
+/**
+ * Floor an hourly row to its chart bucket. Modulo, not division: a bound width
+ * arrives as a float, so `(hour_ms / w) * w` would never truncate.
+ */
+function bucketExpr(bucketMs: number): SqlFragment {
+  return sql`(hour_ms - (hour_ms % ${bucketMs}))`;
 }
 
 function optionalNumber(v: number | string | null): number | undefined {
@@ -423,7 +436,7 @@ export class StreamSessionRepository {
       bucket: number | string;
       bytes: number | string;
     }>(
-      sql`SELECT (hour_ms / ${bucketMs}) * ${bucketMs} AS bucket, SUM(bytes) AS bytes
+      sql`SELECT ${bucketExpr(bucketMs)} AS bucket, SUM(bytes) AS bytes
             FROM stream_bandwidth
            WHERE hour_ms >= ${sinceMs}
            GROUP BY bucket
@@ -431,6 +444,29 @@ export class StreamSessionRepository {
     );
     return rows.map((r) => ({
       bucketMs: Number(r.bucket),
+      bytes: Number(r.bytes ?? 0),
+    }));
+  }
+
+  /** The same buckets split per user, for the per-user chart view. */
+  static async bandwidthSeriesByUser(
+    sinceMs: number,
+    bucketMs: number
+  ): Promise<StreamBandwidthUserBucket[]> {
+    const rows = await getDb().query<{
+      bucket: number | string;
+      username: string;
+      bytes: number | string;
+    }>(
+      sql`SELECT ${bucketExpr(bucketMs)} AS bucket, username, SUM(bytes) AS bytes
+            FROM stream_bandwidth
+           WHERE hour_ms >= ${sinceMs}
+           GROUP BY bucket, username
+           ORDER BY bucket ASC`
+    );
+    return rows.map((r) => ({
+      bucketMs: Number(r.bucket),
+      username: r.username,
       bytes: Number(r.bytes ?? 0),
     }));
   }
