@@ -93,6 +93,8 @@ interface Session {
   /** Read the progress bar tracks; players hold one at a time. */
   newestReadId: number;
   emaBytesPerSec: number;
+  /** Bytes seen since the rate last advanced. */
+  unratedBytes: number;
   lastChunkAt: number;
   /** Needs writing on the next flush. */
   dirty: boolean;
@@ -184,6 +186,7 @@ export class StreamRegistry {
       reads: new Map(),
       newestReadId: 0,
       emaBytesPerSec: 0,
+      unratedBytes: 0,
       lastChunkAt: now,
       dirty: true,
     };
@@ -230,6 +233,12 @@ export class StreamRegistry {
     session.reads.set(read.id, read);
     session.newestReadId = read.id;
     session.requests++;
+    // A quiet stretch is a pause, not a slow transfer, so the rate resumes from
+    // this read rather than averaging the gap in and reading near zero.
+    if (now - session.lastChunkAt > ACTIVITY_WINDOW_MS) {
+      session.lastChunkAt = now;
+      session.unratedBytes = 0;
+    }
     session.lastSeenAt = now;
     session.dirty = true;
     if (input.size && !session.size) session.size = input.size;
@@ -250,10 +259,13 @@ export class StreamRegistry {
         session.lastSeenAt = at;
         session.dirty = true;
         read.bytes += bytes;
+        session.unratedBytes += bytes;
         if (dtMs > 0) {
           const w = Math.exp(-dtMs / RATE_TAU_MS);
           session.emaBytesPerSec =
-            session.emaBytesPerSec * w + (bytes / dtMs) * 1000 * (1 - w);
+            session.emaBytesPerSec * w +
+            (session.unratedBytes / dtMs) * 1000 * (1 - w);
+          session.unratedBytes = 0;
           session.lastChunkAt = at;
         }
       },
