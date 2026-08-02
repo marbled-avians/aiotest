@@ -58,6 +58,13 @@ export const STALE_SESSION_MS = 24 * 60 * 60_000;
  */
 const STUCK_READ_MS = 6 * 60 * 60_000;
 
+/**
+ * How often the caches admission reads are refreshed while nothing is
+ * streaming. The flush itself runs far more often to keep live sessions
+ * current, which with none of them is pure query load.
+ */
+const IDLE_REFRESH_MS = 60_000;
+
 /** Raised on a reader whose session was force-stopped. */
 export class StreamStoppedError extends Error {
   readonly code = 'STREAM_STOPPED';
@@ -132,6 +139,7 @@ export class StreamRegistry {
   /** Ended sessions still to be written out. */
   private finalised: Session[] = [];
   private readSeq = 0;
+  private lastRefreshAt = 0;
 
   readonly instanceId = instanceId();
 
@@ -502,6 +510,12 @@ export class StreamRegistry {
         'failed to persist stream sessions; retrying on the next flush'
       );
     }
+
+    const idle = this.byKey.size === 0 && upserts.length === 0;
+    if (idle && now - this.lastRefreshAt < IDLE_REFRESH_MS) {
+      return { written, ended };
+    }
+    this.lastRefreshAt = now;
 
     await Promise.all([refreshStreamBans(), refreshBandwidthUsage(now)]);
     this.enforceBans();

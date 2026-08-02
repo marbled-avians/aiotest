@@ -44,3 +44,4 @@ export {
   type StreamBandwidthOverview,
 } from './service.js';
 export { proxyTargetKey, usenetTargetKey } from './target-key.js';
+export { instanceId } from './instance-id.js';
