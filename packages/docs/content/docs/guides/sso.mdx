@@ -251,9 +251,10 @@ Grant `createConfig` instead if they should also be able to make new configurati
 This matches what `none` already does in `AIOSTREAMS_AUTH_PERMISSIONS`, so a login-only user behaves the same whether they arrive by password or SSO.
 
 <Callout type="info">
-  Today `admin` is the only permission that changes what a signed-in session can
-  do, because it is what the dashboard checks. Mapping a group to `proxy` or
-  `sabnzbd` is recorded on the session but has no effect yet, since those
+  Today `admin` and `createConfig` are the permissions that change what a
+  signed-in session can do, because they are what the dashboard and
+  configuration creation check. Mapping a group to `proxy`, `service` or
+  `sabnzbd` is recorded on the session but has no effect, since those
   features authenticate with Basic credentials rather than a session.
 </Callout>
 

@@ -82,6 +82,8 @@ export function LoginPage() {
 
   const params = new URLSearchParams(window.location.search);
 
+  const initialError = React.useRef(params.get('error')).current;
+
   const oidc = status?.settings.oidc;
   const localLoginEnabled = oidc?.localLoginEnabled !== false;
   const ssoStartUrl = `/api/v1/auth/oidc/start?next=${encodeURIComponent(
@@ -89,8 +91,7 @@ export function LoginPage() {
   )}`;
 
   React.useEffect(() => {
-    const error = params.get('error');
-    const entry = error ? LOGIN_ERRORS[error] : undefined;
+    const entry = initialError ? LOGIN_ERRORS[initialError] : undefined;
     if (entry) {
       toast.error(entry.title, { description: entry.description });
       params.delete('error');
@@ -103,11 +104,11 @@ export function LoginPage() {
     }
   }, []);
 
-  // `?local=1` is the documented recovery path. Skipping on `?error=` stops a
-  // refused user bouncing back to the provider forever.
+  // `?local=1` is the documented recovery path. Skipping when the navigation
+  // carried an error stops a refused user bouncing back to the provider forever.
   React.useEffect(() => {
     if (!oidc?.enabled || !oidc.autoRedirect) return;
-    if (params.has('local') || params.has('error')) return;
+    if (params.has('local') || initialError) return;
     window.location.assign(ssoStartUrl);
   }, [oidc?.enabled, oidc?.autoRedirect]);
 

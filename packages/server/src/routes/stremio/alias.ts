@@ -1,12 +1,6 @@
-import {
-  APIError,
-  constants,
-  createLogger,
-  resolveConfigAlias,
-} from '@aiostreams/core';
+import { APIError, constants, resolveConfigAlias } from '@aiostreams/core';
 import { Router, Request, Response } from 'express';
 
-const logger = createLogger('server');
 const router: Router = Router();
 
 interface AliasParams {
@@ -29,7 +23,6 @@ router.get(
     }
 
     const redirectPath = `/stremio/${configuration.uuid}/${configuration.encryptedPassword}${wildcardPath ? `/${wildcardPath}` : ''}`;
-    logger.debug(`Redirecting alias ${alias} to ${redirectPath}`);
 
     res.redirect(redirectPath);
   }

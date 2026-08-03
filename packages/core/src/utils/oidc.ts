@@ -20,6 +20,22 @@ export function parsePermissionSpec(spec: string): Permission[] | null {
 }
 
 /**
+ * Own-property lookup because group names come from the provider: `constructor`
+ * and `__proto__` are legal group names that would otherwise return something
+ * off Object.prototype.
+ */
+function lookupSpec(
+  groupPermissions: Record<string, string>,
+  group: string
+): string | undefined {
+  if (!Object.prototype.hasOwnProperty.call(groupPermissions, group)) {
+    return undefined;
+  }
+  const spec = groupPermissions[group];
+  return typeof spec === 'string' ? spec : undefined;
+}
+
+/**
  * Permissions for an OIDC subject, from its group claim. `null` means refuse
  * the login; an empty array means admit with no permissions, matching what
  * `none` does for an AIOSTREAMS_AUTH user (login-only, config page but no
@@ -36,10 +52,18 @@ export function resolveOidcPermissions(
   const granted = new Set<Permission>();
   let matched = false;
   for (const group of groups) {
-    const spec = groupPermissions[group];
+    const spec = lookupSpec(groupPermissions, group);
     if (spec === undefined) continue;
     matched = true;
-    for (const permission of parsePermissionSpec(spec) ?? []) {
+    const parsed = parsePermissionSpec(spec);
+    if (parsed === null) {
+      logger.error(
+        { group, spec },
+        'SSO group is mapped to an unparseable permission list; refusing the login'
+      );
+      return null;
+    }
+    for (const permission of parsed) {
       granted.add(permission);
     }
   }
@@ -47,7 +71,15 @@ export function resolveOidcPermissions(
     // An unset default is the fail-closed case; an explicit `none` is the
     // operator admitting unmatched identities with nothing.
     if (defaultSpec.trim() === '') return null;
-    for (const permission of parsePermissionSpec(defaultSpec) ?? []) {
+    const parsed = parsePermissionSpec(defaultSpec);
+    if (parsed === null) {
+      logger.error(
+        { spec: defaultSpec },
+        'SSO default permissions are unparseable; refusing the login'
+      );
+      return null;
+    }
+    for (const permission of parsed) {
       granted.add(permission);
     }
   }

@@ -200,8 +200,8 @@ export const oidcSchema = {
     default: {} as Record<string, string>,
     label: 'Group permissions',
     description: {
-      ui: 'Maps a group from the groups claim to permissions. Valid: `admin`, `proxy`, `service`, `sabnzbd`, or `none`; combine with `|`. Only `admin` currently affects what a signed-in session can do.',
-      env: 'Maps groups to permissions. Comma-separated `group=perm|perm` entries (valid: admin, proxy, service, sabnzbd, none). Group names containing "," or "=" (such as LDAP DNs) must use the JSON object form instead, e.g. {"cn=admins,ou=groups,dc=example,dc=com":"admin"}.',
+      ui: `Maps a group from the groups claim to permissions. Valid: ${PERMISSION_NAMES.map((p) => `\`${p}\``).join(', ')}, or \`none\`; combine with \`|\`. \`admin\` implies all of them.`,
+      env: `Maps groups to permissions. Comma-separated \`group=perm|perm\` entries (valid: ${PERMISSION_NAMES.join(', ')}, none). Group names containing "," or "=" (such as LDAP DNs) must use the JSON object form instead, e.g. {"cn=admins,ou=groups,dc=example,dc=com":"admin"}.`,
     },
     env: 'AIOSTREAMS_OIDC_GROUP_PERMISSIONS',
     requiresRestart: false,

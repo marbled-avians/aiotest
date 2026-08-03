@@ -139,7 +139,7 @@ router.get('/oidc/callback', oidcRateLimiter, async (req, res) => {
     if (resolved === null) {
       logger.warn(
         { username, groups },
-        'SSO login refused: no group matched and no default permissions are set'
+        'SSO login refused: the groups claim resolved to no permissions'
       );
       failToLogin(res, constants.ErrorCode.OIDC_NO_PERMISSIONS);
       return;
