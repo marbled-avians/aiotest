@@ -1,4 +1,5 @@
 export { default as userApi } from './user.js';
+export { default as profilesApi } from './profiles.js';
 export { default as healthApi } from './health.js';
 export { default as statusApi } from './status.js';
 export { default as formatApi } from './format.js';

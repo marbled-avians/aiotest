@@ -359,6 +359,54 @@ export async function changePassword(
 }
 
 /**
+ * Saved configurations, keyed to the signed-in session rather than to a
+ * uuid + password the browser has to keep hold of.
+ */
+export interface ConfigProfile {
+  id: string;
+  uuid: string;
+  label: string;
+  alias: string | null;
+  needsRelink: boolean;
+  lastOpenedAt?: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export async function listConfigProfiles() {
+  return api<{ profiles: ConfigProfile[]; limit: number }>('/profiles');
+}
+
+export async function saveConfigProfile(
+  uuid: string,
+  password: string,
+  label?: string
+) {
+  return api<{ profile: ConfigProfile }>('POST /profiles', {
+    body: { uuid, password, label },
+  });
+}
+
+export async function updateConfigProfile(
+  id: string,
+  fields: { label?: string; alias?: string | null }
+) {
+  return api<{ profile: ConfigProfile }>(`PATCH /profiles/${id}`, {
+    body: fields,
+  });
+}
+
+export async function deleteConfigProfile(id: string) {
+  return api<{ deleted: boolean }>(`DELETE /profiles/${id}`);
+}
+
+export async function openConfigProfile(id: string) {
+  return api<{ uuid: string; password: string; encryptedPassword: string }>(
+    `POST /profiles/${id}/open`
+  );
+}
+
+/**
  * Resolve synced items (regex patterns and/or stream expressions) from URLs
  */
 export async function resolveSynced(

@@ -10,6 +10,7 @@ export * from './regex-access.js';
 export * from './sel-access.js';
 export * from './crypto.js';
 export * from './permissions.js';
+export * from './config-alias.js';
 export * from './auth.js';
 export * from './oidc.js';
 export * from './http.js';

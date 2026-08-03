@@ -1,0 +1,78 @@
+---
+title: Profiles
+description: Save configurations to the account you sign in with and reopen them without the config password.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+A configuration is protected by a password, and the browser only holds that password in memory, so refreshing the configure page means typing the UUID and password again. If the config page is also gated by `AIOSTREAMS_AUTH_REQUIRED`, that is two sign-ins for one page.
+
+A profile removes the second one. While signed in, you save a configuration once, and afterwards you pick it from a list.
+
+## Saving a profile
+
+Open **Save / Install** with a configuration loaded and use **Save as profile**, or tick **Save as a profile** in the Load Configuration dialog when you enter a UUID and password.
+
+Saving is always explicit, because it stores the configuration password on the server. The stored value is the same encrypted blob that already appears in every install URL, encrypted with `SECRET_KEY`, so a copy of the database alone opens nothing.
+
+You can save up to 50 profiles per account.
+
+## Reopening one
+
+Open **Load Configuration**. Your profiles appear above the UUID and password fields; picking one loads it. Arriving at a `/stremio/<uuid>/.../configure` URL for a configuration you have saved opens it directly, without asking.
+
+<Callout type="info">
+  Profiles belong to the account you signed in with, not to the instance.
+  Anyone else signing in sees only their own, administrators included. No
+  permission is needed beyond being able to sign in, so a login-only account
+  can use them.
+</Callout>
+
+## Share aliases
+
+A profile can be given an **alias**, which publishes the configuration at a short install URL:
+
+```
+https://your-instance.example/stremio/u/<alias>/manifest.json
+```
+
+Set one and the **Manifest URL** on the Save / Install page switches to it, including the *Install to Stremio* buttons. The long UUID and password URL keeps working, so anything already installed is unaffected.
+
+An alias is 2 to 64 characters of `a-z`, `0-9`, dot, dash or underscore, lowercase, and globally unique across the instance. It cannot look like a UUID, and it cannot reuse a name already published through `ALIASED_CONFIGURATIONS`.
+
+<Callout type="warn">
+  The alias stands in for the UUID and password: following the URL redirects to
+  the full one. Anyone who has it can install the configuration, so choose a
+  name that is not easy to guess.
+</Callout>
+
+### Relationship to `ALIASED_CONFIGURATIONS`
+
+The `ALIASED_CONFIGURATIONS` setting still works and is unchanged. It is resolved **first**, so an alias defined there always wins over a profile's alias, and a profile can never take over an install URL you published from settings.
+
+Because aliases are cached in each process for a short interval, an alias you add or remove takes effect immediately on the instance that made the change, and within about 15 seconds on any other replicas.
+
+## Sign-in methods
+
+Profiles are keyed to the username you sign in with, whether that came from `AIOSTREAMS_AUTH` or from your identity provider.
+
+If the same person signs in both ways, enable [`AIOSTREAMS_OIDC_LINK_BY_USERNAME`](/docs/guides/sso) so both routes resolve to one username and therefore one list. Without it, an SSO login whose username collides with a local user is refused outright, so there is no way to end up with two lists by accident.
+
+<Callout type="warn">
+  Because the key is the username, an identity provider that later issues the
+  same username to a different person hands that person the previous holder's
+  profiles, including the ability to open them. If usernames are recycled at
+  your provider, point **Username claim** at `sub`.
+</Callout>
+
+Sessions are stateless, so removing a user from `AIOSTREAMS_AUTH` does not end a session they already hold, and their profiles stay reachable until it expires.
+
+## When a profile stops working
+
+A profile is marked as needing its password again if the stored password no longer opens the configuration, which happens if `SECRET_KEY` is rotated or the database is restored from a backup taken before a password change. Changing a configuration's password through AIOStreams updates every profile pointing at it automatically.
+
+Pick the entry and enter the current password to repair it in place.
+
+## Deleting one
+
+**Delete profile** removes the saved entry. The configuration itself, its UUID, and its password are untouched, and install URLs for it keep working, apart from the alias. Deleting the configuration removes every profile pointing at it.
