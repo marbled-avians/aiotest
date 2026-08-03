@@ -253,6 +253,8 @@ interface GDriveTokenResponse {
 export interface SessionUser {
   username: string;
   isAdmin: boolean;
+  permissions: string[];
+  source: 'password' | 'oidc';
 }
 
 export async function login(username: string, password: string) {
