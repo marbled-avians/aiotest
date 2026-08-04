@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  byteSize,
   cacheTtlMap,
   nonNegativeInt,
   positiveInt,
@@ -203,6 +204,16 @@ export const resourcesSchema = {
       description: 'Maximum number of items in the shared SQL cache.',
       env: 'SQL_CACHE_MAX_SIZE',
       requiresRestart: true,
+      secret: false,
+    },
+    maxValueBytes: {
+      schema: byteSize,
+      default: 2 * 1000 * 1000,
+      label: 'Max cached value size',
+      description:
+        'Largest single value written to the Redis or SQL cache (`0` disables the limit). Oversized entries are skipped rather than stored. A skipped entry is recomputed on each request, so raising this trades memory for CPU. Accepts plain bytes or `2MB`-style strings.',
+      env: 'MAX_CACHE_VALUE_BYTES',
+      requiresRestart: false,
       secret: false,
     },
     manifest: {
