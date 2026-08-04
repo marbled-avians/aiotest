@@ -532,8 +532,9 @@ export class Wrapper {
       return await requestPromise;
     }
 
-    const timeoutPromise: Promise<T> = new Promise<T>((_, reject) =>
-      setTimeout(
+    let timeoutHandle: NodeJS.Timeout | undefined;
+    const timeoutPromise: Promise<T> = new Promise<T>((_, reject) => {
+      timeoutHandle = setTimeout(
         () =>
           reject(
             new Error(
@@ -541,8 +542,8 @@ export class Wrapper {
             )
           ),
         timeout
-      )
-    );
+      );
+    });
 
     try {
       return await Promise.race([requestPromise, timeoutPromise]);
@@ -575,6 +576,8 @@ export class Wrapper {
         });
       }
       throw error;
+    } finally {
+      clearTimeout(timeoutHandle);
     }
   }
 
